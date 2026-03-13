@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timer — Until 11:00 AM</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --panel: #111118;
+    --border: #1e1e2e;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #e8e8f0;
+    --muted: #4a4a6a;
+    --done: #2a2a3a;
+    --done-text: #3a3a5a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,255,71,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* ── HEADER ── */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+    position: relative;
+  }
+
+  .label {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(56px, 10vw, 96px);
+    line-height: 0.9;
+    color: var(--text);
+    letter-spacing: 0.02em;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+  }
+
+  /* ── CLOCKS ROW ── */
+  .clocks-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    margin-bottom: 48px;
+    width: 100%;
+    max-width: 780px;
+  }
+
+  /* ── MAIN COUNTDOWN ── */
+  .main-clock {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent);
+    padding: 28px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .main-clock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(232,255,71,0.03) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* ── MINI TIMER ── */
+  .mini-clock {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 2px solid var(--accent2);
+    padding: 28px 32px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mini-clock::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,107,53,0.03) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  /* mini progress bar at bottom */
+  .mini-progress-track {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--border);
+  }
+
+  .mini-progress-bar {
+    height: 100%;
+    background: var(--accent2);
+    transition: width 1s linear;
+    width: 0%;
+  }
+
+  .clock-label {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+
+  .mini-clock .clock-label { color: rgba(255,107,53,0.6); }
+
+  .digits {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(48px, 9vw, 80px);
+    line-height: 1;
+    letter-spacing: 0.05em;
+    color: var(--text);
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+  }
+
+  .digits .sep {
+    color: var(--accent);
+    opacity: 0.6;
+    animation: blink 1s steps(1) infinite;
+    font-size: 0.8em;
+    margin-bottom: 4px;
+  }
+
+  .mini-clock .digits .sep { color: var(--accent2); }
+  .mini-clock .digits { font-size: clamp(48px, 9vw, 80px); }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .unit-labels {
+    display: flex;
+    gap: 0;
+    margin-top: 8px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+
+  .unit-label { flex: 1; }
+
+  .target-time {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .target-time strong {
+    color: var(--accent);
+    font-size: 13px;
+    letter-spacing: 0.1em;
+  }
+
+  .mini-clock .target-time strong { color: var(--accent2); }
+
+  @media (max-width: 600px) {
+    .clocks-row { grid-template-columns: 1fr; }
+  }
+
+  /* ── STATUS PILL ── */
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 4px 10px;
+    border: 1px solid currentColor;
+    text-transform: uppercase;
+  }
+
+  .status.active { color: var(--accent); }
+  .status.done { color: var(--muted); }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.4); opacity: 0.5; }
+  }
+
+  /* ── 15-MIN TIMERS ── */
+  .section-label {
+    width: 100%;
+    max-width: 780px;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .timers-grid {
+    width: 100%;
+    max-width: 780px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .timer-row {
+    display: grid;
+    grid-template-columns: 48px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    padding: 14px 20px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timer-row.active {
+    border-left-color: var(--accent);
+    background: #141420;
+  }
+
+  .timer-row.active .progress-fill {
+    opacity: 1;
+  }
+
+  .timer-row.past {
+    border-left-color: var(--done);
+    opacity: 0.4;
+  }
+
+  .timer-row.upcoming {
+    border-left-color: var(--border);
+  }
+
+  /* progress bar background */
+  .progress-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: rgba(232,255,71,0.04);
+    transition: width 1s linear;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .timer-index {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1;
+  }
+
+  .timer-row.active .timer-index { color: var(--accent); }
+  .timer-row.past .timer-index { color: var(--done-text); }
+
+  .timer-info { min-width: 0; }
+
+  .timer-time {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: 0.05em;
+    margin-bottom: 3px;
+  }
+
+  .timer-row.past .timer-time { color: var(--done-text); }
+
+  .timer-desc {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  .timer-countdown {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.05em;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .timer-row.active .timer-countdown { color: var(--accent); }
+  .timer-row.past .timer-countdown { color: var(--done-text); font-size: 14px; font-family: 'DM Mono', monospace; }
+  .timer-row.upcoming .timer-countdown { color: var(--muted); }
+
+  /* ── DONE STATE ── */
+  .all-done {
+    display: none;
+    text-align: center;
+    padding: 40px;
+  }
+
+  .all-done h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  /* ── CURRENT TIME ── */
+  .current-time-bar {
+    width: 100%;
+    max-width: 780px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+  }
+
+  #currentTime { color: var(--text); }
+
+  /* ── ALARM OVERLAY ── */
+  .alarm-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .alarm-overlay.show { pointer-events: all; opacity: 1; }
+  .alarm-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(10,10,15,0.75);
+    backdrop-filter: blur(4px);
+  }
+  .alarm-box {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--accent2);
+    border-top: 3px solid var(--accent2);
+    padding: 40px 48px;
+    text-align: center;
+    animation: alarmPulse 0.6s ease-in-out infinite alternate;
+    max-width: 360px;
+    width: 90%;
+  }
+  @keyframes alarmPulse {
+    from { box-shadow: 0 0 20px rgba(255,107,53,0.2); }
+    to   { box-shadow: 0 0 50px rgba(255,107,53,0.5), 0 0 100px rgba(255,107,53,0.15); }
+  }
+  .alarm-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    display: block;
+    animation: shake 0.5s ease-in-out infinite;
+  }
+  @keyframes shake {
+    0%,100% { transform: rotate(-8deg); }
+    50%      { transform: rotate(8deg); }
+  }
+  .alarm-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--accent2);
+    letter-spacing: 0.1em;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .alarm-subtitle {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 32px;
+  }
+  .alarm-dismiss {
+    background: var(--accent2);
+    color: var(--bg);
+    border: none;
+    padding: 14px 40px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: transform 0.1s, opacity 0.1s;
+    width: 100%;
+  }
+  .alarm-dismiss:hover { opacity: 0.85; transform: scale(0.98); }
+  .alarm-dismiss:active { transform: scale(0.95); }
+  .alarm-auto {
+    margin-top: 14px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+  .alarm-auto span { color: var(--accent2); }
+
+  @media (max-width: 480px) {
+    .main-clock, .mini-clock { padding: 20px; }
+    .timer-row { padding: 12px 14px; gap: 12px; }
+    header { margin-bottom: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Alarm overlay -->
+<div class="alarm-overlay" id="alarmOverlay">
+  <div class="alarm-box">
+    <span class="alarm-icon">⏰</span>
+    <div class="alarm-title">TIMER</div>
+    <div class="alarm-subtitle" id="alarmSubtitle">15-Minute Interval</div>
+    <button class="alarm-dismiss" id="alarmDismiss" onclick="dismissAlarm()">DISMISS ALARM</button>
+    <div class="alarm-auto">Auto-dismisses in <span id="alarmAutoSec">60</span>s</div>
+  </div>
+</div>
+
+<header>
+  <p class="label">Countdown Active</p>
+  <h1>Next<br><span>5 Hours</span></h1>
+  <p class="subtitle">From now · 15-min intervals</p>
+</header>
+
+<div class="current-time-bar">
+  <span>NOW</span>
+  <span id="currentTime">--:--:-- --</span>
+</div>
+
+<!-- Two clocks side by side -->
+<div class="clocks-row">
+
+  <!-- Main countdown to 11am -->
+  <div class="main-clock">
+    <p class="clock-label">Time remaining (5-hour countdown)</p>
+    <div class="digits">
+      <span id="dHH">00</span>
+      <span class="sep">:</span>
+      <span id="dMM">00</span>
+      <span class="sep">:</span>
+      <span id="dSS">00</span>
+    </div>
+    <div class="unit-labels">
+      <span class="unit-label">HRS</span>
+      <span class="unit-label">MIN</span>
+      <span class="unit-label">SEC</span>
+    </div>
+    <div class="target-time">
+      <span>Ends at: <strong id="targetLabel">--:-- --</strong></span>
+      <span id="mainStatus" class="status active"><span class="dot"></span>Running</span>
+    </div>
+  </div>
+
+  <!-- Active 15-min interval timer -->
+  <div class="mini-clock">
+    <p class="clock-label">Current 15-min interval</p>
+    <div class="digits">
+      <span id="mMM">00</span>
+      <span class="sep">:</span>
+      <span id="mSS">00</span>
+    </div>
+    <div class="unit-labels">
+      <span class="unit-label">MIN</span>
+      <span class="unit-label">SEC</span>
+    </div>
+    <div class="target-time">
+      <span>Next: <strong id="miniNextTime">--:-- --</strong></span>
+      <span id="miniLabel" style="font-size:10px;letter-spacing:0.15em;color:var(--muted)">INTERVAL 01</span>
+    </div>
+    <div class="mini-progress-track">
+      <div class="mini-progress-bar" id="miniBar"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 15-min timers -->
+<p class="section-label">15-Minute Intervals</p>
+<div class="timers-grid" id="timersGrid"></div>
+
+<div class="all-done" id="allDone">
+  <h2>5 HOURS</h2>
+  <p style="color:var(--muted);letter-spacing:0.2em;font-size:12px;margin-top:12px;">COUNTDOWN COMPLETE</p>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────
+  // Target: exactly 5 hours from page load
+
+  function getTarget5Hours() {
+    return new Date(Date.now() + 5 * 60 * 60 * 1000);
+  }
+
+  function buildIntervals(target) {
+    // Build 15-min markers counting back from target
+    const intervals = [];
+    // Go from now (rounded to previous 15-min boundary near start) up to target
+    const now = new Date();
+    // Find how many 15-min slots fit between now and target
+    const totalMs = target - now;
+    const totalSlots = Math.ceil(totalMs / (15 * 60000));
+    const maxSlots = 50; // cap display
+
+    const count = Math.min(totalSlots, maxSlots);
+    for (let i = count; i >= 1; i--) {
+      const t = new Date(target.getTime() - i * 15 * 60000);
+      intervals.push(t);
+    }
+    intervals.push(target); // the final 11am
+    return intervals;
+  }
+
+  // Format time in CST (UTC-6)
+  function formatCST(date) {
+    return date.toLocaleTimeString('en-US', {
+      timeZone: 'America/Chicago',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  }
+
+  function pad(n) { return String(n).padStart(2,'0'); }
+
+  // ── BUILD DOM ────────────────────────────────────────
+  const target = getTarget5Hours();
+  document.getElementById('targetLabel').textContent = formatCST(target);
+  const intervals = buildIntervals(target);
+  const grid = document.getElementById('timersGrid');
+
+  intervals.forEach((t, i) => {
+    const isLast = i === intervals.length - 1;
+    const row = document.createElement('div');
+    row.className = 'timer-row upcoming';
+    row.id = `row-${i}`;
+    row.innerHTML = `
+      <div class="progress-fill" id="pf-${i}"></div>
+      <div class="timer-index">${String(i+1).padStart(2,'0')}</div>
+      <div class="timer-info">
+        <div class="timer-time">${formatCST(t)}</div>
+        <div class="timer-desc">${isLast ? 'FINAL TARGET' : `Interval ${i+1} of ${intervals.length-1}`}</div>
+      </div>
+      <div class="timer-countdown" id="cd-${i}">--:--</div>
+    `;
+    grid.appendChild(row);
+  });
+
+  // ── ALARM ENGINE ─────────────────────────────────────
+  let alarmCtx = null;
+  let alarmNodes = [];        // track oscillator + gain nodes
+  let alarmAutoTimer = null;  // setTimeout for 60s auto-dismiss
+  let alarmTickInterval = null; // setInterval for countdown display
+  let alarmActive = false;
+
+  function startAlarm(label) {
+    if (alarmActive) return; // don't stack alarms
+    alarmActive = true;
+
+    // Show overlay
+    document.getElementById('alarmSubtitle').textContent = label;
+    document.getElementById('alarmAutoSec').textContent = '60';
+    document.getElementById('alarmOverlay').classList.add('show');
+
+    // Build sustained alarm sound: repeating beep pattern via Web Audio
+    try {
+      alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
+      scheduleAlarmBeeps();
+    } catch(e) {}
+
+    // Countdown display
+    let remaining = 60;
+    alarmTickInterval = setInterval(() => {
+      remaining--;
+      const el = document.getElementById('alarmAutoSec');
+      if (el) el.textContent = remaining;
+      if (remaining <= 0) dismissAlarm();
+    }, 1000);
+
+    // Auto-dismiss after 60s
+    alarmAutoTimer = setTimeout(dismissAlarm, 60000);
+
+    // Browser notification
+    if (Notification.permission === 'granted') {
+      new Notification('⏰ 15-Minute Timer', { body: label });
+    }
+  }
+
+  function scheduleAlarmBeeps() {
+    if (!alarmCtx || !alarmActive) return;
+    const now = alarmCtx.currentTime;
+    // Pattern: three short beeps, then a pause, repeat every 2 seconds
+    const pattern = [0, 0.18, 0.36]; // beep offsets within the 2s cycle
+    pattern.forEach(offset => {
+      const o = alarmCtx.createOscillator();
+      const g = alarmCtx.createGain();
+      o.connect(g); g.connect(alarmCtx.destination);
+      o.frequency.value = 880;
+      o.type = 'sine';
+      const t = now + offset;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.35, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+      o.start(t);
+      o.stop(t + 0.18);
+      alarmNodes.push(o);
+    });
+    // Schedule next cycle in 2s
+    if (alarmActive) {
+      setTimeout(() => scheduleAlarmBeeps(), 2000);
+    }
+  }
+
+  function dismissAlarm() {
+    alarmActive = false;
+
+    // Hide overlay
+    document.getElementById('alarmOverlay').classList.remove('show');
+
+    // Stop audio
+    if (alarmCtx) {
+      alarmNodes.forEach(n => { try { n.stop(); } catch(e) {} });
+      alarmNodes = [];
+      try { alarmCtx.close(); } catch(e) {}
+      alarmCtx = null;
+    }
+
+    // Clear timers
+    clearTimeout(alarmAutoTimer);
+    clearInterval(alarmTickInterval);
+  }
+
+  // Request notification permission
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
+  // ── TICK ─────────────────────────────────────────────
+  const alarmedSet = new Set();
+
+  function tick() {
+    const now = new Date();
+
+    // Current time display (CST)
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', {
+      timeZone: 'America/Chicago',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
+    });
+
+    // Main countdown
+    const mainDiff = target - now;
+    if (mainDiff <= 0) {
+      document.getElementById('dHH').textContent = '00';
+      document.getElementById('dMM').textContent = '00';
+      document.getElementById('dSS').textContent = '00';
+      const s = document.getElementById('mainStatus');
+      s.className = 'status done';
+      s.innerHTML = 'Complete';
+      document.getElementById('allDone').style.display = 'block';
+    } else {
+      const totalSec = Math.floor(mainDiff / 1000);
+      const hh = Math.floor(totalSec / 3600);
+      const mm = Math.floor((totalSec % 3600) / 60);
+      const ss = totalSec % 60;
+      document.getElementById('dHH').textContent = pad(hh);
+      document.getElementById('dMM').textContent = pad(mm);
+      document.getElementById('dSS').textContent = pad(ss);
+    }
+
+    // Per-interval rows
+    intervals.forEach((t, i) => {
+      const diff = t - now;
+      const row = document.getElementById(`row-${i}`);
+      const cd = document.getElementById(`cd-${i}`);
+      const pf = document.getElementById(`pf-${i}`);
+
+      if (diff <= 0) {
+        // Past
+        row.className = 'timer-row past';
+        cd.textContent = 'DONE';
+
+        // Fire alarm exactly once
+        if (!alarmedSet.has(i)) {
+          alarmedSet.add(i);
+          if (now - t < 5000) { // only if we just crossed it (within 5s)
+            startAlarm(formatCST(t) + ' — Timer ' + (i+1));
+          }
+        }
+      } else {
+        const totalSec = Math.floor(diff / 1000);
+        const mm = Math.floor(totalSec / 60);
+        const ss = totalSec % 60;
+        // Determine if this is the NEXT upcoming (active) timer
+        const prevPast = i === 0 || (intervals[i-1] - now) <= 0;
+        if (prevPast && diff > 0) {
+          row.className = 'timer-row active';
+          cd.textContent = pad(mm) + ':' + pad(ss);
+          // Progress within this 15-min window
+          const windowMs = 15 * 60000;
+          const elapsed = windowMs - diff % windowMs;
+          const pct = Math.min(100, (elapsed / windowMs) * 100);
+          pf.style.width = pct + '%';
+
+          // ── Drive the mini clock ──
+          document.getElementById('mMM').textContent = pad(mm);
+          document.getElementById('mSS').textContent = pad(ss);
+          document.getElementById('miniBar').style.width = pct + '%';
+          document.getElementById('miniNextTime').textContent = formatCST(t);
+          const isLastInterval = i === intervals.length - 1;
+          document.getElementById('miniLabel').textContent =
+            isLastInterval ? 'FINAL INTERVAL' : `INTERVAL ${String(i+1).padStart(2,'0')} OF ${intervals.length - 1}`;
+        } else {
+          row.className = 'timer-row upcoming';
+          cd.textContent = pad(mm) + ':' + pad(ss);
+        }
+      }
+    });
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
