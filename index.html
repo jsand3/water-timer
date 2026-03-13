@@ -55,8 +55,7 @@
     transition: opacity 0.4s ease;
   }
   .start-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
+    display: none;
   }
   .start-overlay .start-label {
     font-size: 11px;
@@ -701,19 +700,17 @@
     s.className = 'status active';
     s.innerHTML = '<span class="dot"></span>Running';
 
-    // Set target
-    target = new Date(Date.now() + 5 * 60 * 60 * 1000);
+    // Set target: exactly 5 hours from now
+    const startTime = Date.now();
+    target = new Date(startTime + 5 * 60 * 60 * 1000);
     document.getElementById('targetLabel').textContent = formatCST(target);
 
-    // Build intervals
-    const totalMs = target - Date.now();
-    const totalSlots = Math.ceil(totalMs / (15 * 60000));
-    const count = Math.min(totalSlots, 50);
+    // Build intervals: every 15 min going forward from startTime
+    // 5 hours / 15 min = 20 intervals, last one is the target itself
     intervals = [];
-    for (let i = count; i >= 1; i--) {
-      intervals.push(new Date(target.getTime() - i * 15 * 60000));
+    for (let i = 1; i <= 20; i++) {
+      intervals.push(new Date(startTime + i * 15 * 60 * 1000));
     }
-    intervals.push(target);
 
     // Build grid
     const grid = document.getElementById('timersGrid');
@@ -728,7 +725,7 @@
         <div class="timer-index">${String(i+1).padStart(2,'0')}</div>
         <div class="timer-info">
           <div class="timer-time">${formatCST(t)}</div>
-          <div class="timer-desc">${isLast ? 'FINAL TARGET' : `Interval ${i+1} of ${intervals.length-1}`}</div>
+          <div class="timer-desc">${isLast ? 'FINAL TARGET' : `Interval ${i+1} of 20`}</div>
         </div>
         <div class="timer-countdown" id="cd-${i}">--:--</div>
       `;
@@ -797,14 +794,14 @@
         if (prevPast) {
           row.className = 'timer-row active';
           cd.textContent = pad(mm) + ':' + pad(ss);
-          const pct = Math.min(100, ((15 * 60000 - diff % (15 * 60000)) / (15 * 60000)) * 100);
+          const pct = Math.min(100, ((15 * 60000 - diff) / (15 * 60000)) * 100);
           pf.style.width = pct + '%';
           document.getElementById('mMM').textContent = pad(mm);
           document.getElementById('mSS').textContent = pad(ss);
           document.getElementById('miniBar').style.width = pct + '%';
           document.getElementById('miniNextTime').textContent = formatCST(t);
           document.getElementById('miniLabel').textContent =
-            i === intervals.length - 1 ? 'FINAL INTERVAL' : `INTERVAL ${String(i+1).padStart(2,'0')} OF ${intervals.length - 1}`;
+            i === intervals.length - 1 ? 'FINAL INTERVAL' : `INTERVAL ${String(i+1).padStart(2,'0')} OF 20`;
         } else {
           row.className = 'timer-row upcoming';
           cd.textContent = pad(mm) + ':' + pad(ss);
