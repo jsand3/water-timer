@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Timer — Until 11:00 AM</title>
+<title>Water Timer — 5 Hours</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -39,6 +39,60 @@
     background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,255,71,0.06) 0%, transparent 60%);
     pointer-events: none;
   }
+
+  /* ── START OVERLAY ── */
+  .start-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    background: var(--bg);
+    flex-direction: column;
+    text-align: center;
+    padding: 40px;
+    transition: opacity 0.4s ease;
+  }
+  .start-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .start-overlay .start-label {
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .start-overlay h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(56px, 12vw, 100px);
+    line-height: 0.9;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    margin-bottom: 8px;
+  }
+  .start-overlay h2 span { color: var(--accent); }
+  .start-overlay .start-sub {
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    margin-bottom: 48px;
+  }
+  .start-btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 18px 64px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .start-btn:hover { opacity: 0.85; }
+  .start-btn:active { transform: scale(0.97); }
 
   /* ── HEADER ── */
   header {
@@ -132,7 +186,6 @@
     pointer-events: none;
   }
 
-  /* mini progress bar at bottom */
   .mini-progress-track {
     position: absolute;
     bottom: 0; left: 0; right: 0;
@@ -293,9 +346,7 @@
     background: #141420;
   }
 
-  .timer-row.active .progress-fill {
-    opacity: 1;
-  }
+  .timer-row.active .progress-fill { opacity: 1; }
 
   .timer-row.past {
     border-left-color: var(--done);
@@ -306,7 +357,6 @@
     border-left-color: var(--border);
   }
 
-  /* progress bar background */
   .progress-fill {
     position: absolute;
     top: 0; left: 0; bottom: 0;
@@ -478,13 +528,21 @@
 </head>
 <body>
 
+<!-- Start overlay -->
+<div class="start-overlay" id="startOverlay">
+  <p class="start-label">Water Timer</p>
+  <h2>5<br><span>Hours</span></h2>
+  <p class="start-sub">15-min intervals · alarm at each checkpoint</p>
+  <button class="start-btn" onclick="startTimer()">START TIMER</button>
+</div>
+
 <!-- Alarm overlay -->
 <div class="alarm-overlay" id="alarmOverlay">
   <div class="alarm-box">
     <span class="alarm-icon">⏰</span>
     <div class="alarm-title">TIMER</div>
     <div class="alarm-subtitle" id="alarmSubtitle">15-Minute Interval</div>
-    <button class="alarm-dismiss" id="alarmDismiss" onclick="dismissAlarm()">DISMISS ALARM</button>
+    <button class="alarm-dismiss" onclick="dismissAlarm()">DISMISS ALARM</button>
     <div class="alarm-auto">Auto-dismisses in <span id="alarmAutoSec">60</span>s</div>
   </div>
 </div>
@@ -501,14 +559,11 @@
   <span id="currentTime">--:--:-- --</span>
 </div>
 
-<!-- Two clocks side by side -->
 <div class="clocks-row">
-
-  <!-- Main countdown to 11am -->
   <div class="main-clock">
     <p class="clock-label">Time remaining (5-hour countdown)</p>
     <div class="digits">
-      <span id="dHH">00</span>
+      <span id="dHH">05</span>
       <span class="sep">:</span>
       <span id="dMM">00</span>
       <span class="sep">:</span>
@@ -525,11 +580,10 @@
     </div>
   </div>
 
-  <!-- Active 15-min interval timer -->
   <div class="mini-clock">
     <p class="clock-label">Current 15-min interval</p>
     <div class="digits">
-      <span id="mMM">00</span>
+      <span id="mMM">15</span>
       <span class="sep">:</span>
       <span id="mSS">00</span>
     </div>
@@ -545,10 +599,8 @@
       <div class="mini-progress-bar" id="miniBar"></div>
     </div>
   </div>
-
 </div>
 
-<!-- 15-min timers -->
 <p class="section-label">15-Minute Intervals</p>
 <div class="timers-grid" id="timersGrid"></div>
 
@@ -558,90 +610,38 @@
 </div>
 
 <script>
-  // ── CONFIG ──────────────────────────────────────────
-  // Target: exactly 5 hours from page load
-
-  function getTarget5Hours() {
-    return new Date(Date.now() + 5 * 60 * 60 * 1000);
-  }
-
-  function buildIntervals(target) {
-    // Build 15-min markers counting back from target
-    const intervals = [];
-    // Go from now (rounded to previous 15-min boundary near start) up to target
-    const now = new Date();
-    // Find how many 15-min slots fit between now and target
-    const totalMs = target - now;
-    const totalSlots = Math.ceil(totalMs / (15 * 60000));
-    const maxSlots = 50; // cap display
-
-    const count = Math.min(totalSlots, maxSlots);
-    for (let i = count; i >= 1; i--) {
-      const t = new Date(target.getTime() - i * 15 * 60000);
-      intervals.push(t);
-    }
-    intervals.push(target); // the final 11am
-    return intervals;
-  }
-
-  // Format time in CST (UTC-6)
   function formatCST(date) {
     return date.toLocaleTimeString('en-US', {
       timeZone: 'America/Chicago',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
+      hour: '2-digit', minute: '2-digit', hour12: true
     });
   }
 
   function pad(n) { return String(n).padStart(2,'0'); }
 
-  // ── BUILD DOM ────────────────────────────────────────
-  const target = getTarget5Hours();
-  document.getElementById('targetLabel').textContent = formatCST(target);
-  const intervals = buildIntervals(target);
-  const grid = document.getElementById('timersGrid');
+  // ── State ──
+  let target = null;
+  let intervals = [];
+  let tickInterval = null;
+  let alarmedSet = new Set();
 
-  intervals.forEach((t, i) => {
-    const isLast = i === intervals.length - 1;
-    const row = document.createElement('div');
-    row.className = 'timer-row upcoming';
-    row.id = `row-${i}`;
-    row.innerHTML = `
-      <div class="progress-fill" id="pf-${i}"></div>
-      <div class="timer-index">${String(i+1).padStart(2,'0')}</div>
-      <div class="timer-info">
-        <div class="timer-time">${formatCST(t)}</div>
-        <div class="timer-desc">${isLast ? 'FINAL TARGET' : `Interval ${i+1} of ${intervals.length-1}`}</div>
-      </div>
-      <div class="timer-countdown" id="cd-${i}">--:--</div>
-    `;
-    grid.appendChild(row);
-  });
-
-  // ── ALARM ENGINE ─────────────────────────────────────
+  // ── Alarm engine ──
   let alarmCtx = null;
-  let alarmNodes = [];        // track oscillator + gain nodes
-  let alarmAutoTimer = null;  // setTimeout for 60s auto-dismiss
-  let alarmTickInterval = null; // setInterval for countdown display
+  let alarmNodes = [];
+  let alarmAutoTimer = null;
+  let alarmTickInterval = null;
   let alarmActive = false;
 
   function startAlarm(label) {
-    if (alarmActive) return; // don't stack alarms
+    if (alarmActive) return;
     alarmActive = true;
-
-    // Show overlay
     document.getElementById('alarmSubtitle').textContent = label;
     document.getElementById('alarmAutoSec').textContent = '60';
     document.getElementById('alarmOverlay').classList.add('show');
-
-    // Build sustained alarm sound: repeating beep pattern via Web Audio
     try {
       alarmCtx = new (window.AudioContext || window.webkitAudioContext)();
       scheduleAlarmBeeps();
     } catch(e) {}
-
-    // Countdown display
     let remaining = 60;
     alarmTickInterval = setInterval(() => {
       remaining--;
@@ -649,11 +649,7 @@
       if (el) el.textContent = remaining;
       if (remaining <= 0) dismissAlarm();
     }, 1000);
-
-    // Auto-dismiss after 60s
     alarmAutoTimer = setTimeout(dismissAlarm, 60000);
-
-    // Browser notification
     if (Notification.permission === 'granted') {
       new Notification('⏰ 15-Minute Timer', { body: label });
     }
@@ -662,9 +658,7 @@
   function scheduleAlarmBeeps() {
     if (!alarmCtx || !alarmActive) return;
     const now = alarmCtx.currentTime;
-    // Pattern: three short beeps, then a pause, repeat every 2 seconds
-    const pattern = [0, 0.18, 0.36]; // beep offsets within the 2s cycle
-    pattern.forEach(offset => {
+    [0, 0.18, 0.36].forEach(offset => {
       const o = alarmCtx.createOscillator();
       const g = alarmCtx.createGain();
       o.connect(g); g.connect(alarmCtx.destination);
@@ -674,53 +668,97 @@
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(0.35, t + 0.02);
       g.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-      o.start(t);
-      o.stop(t + 0.18);
+      o.start(t); o.stop(t + 0.18);
       alarmNodes.push(o);
     });
-    // Schedule next cycle in 2s
-    if (alarmActive) {
-      setTimeout(() => scheduleAlarmBeeps(), 2000);
-    }
+    if (alarmActive) setTimeout(() => scheduleAlarmBeeps(), 2000);
   }
 
   function dismissAlarm() {
     alarmActive = false;
-
-    // Hide overlay
     document.getElementById('alarmOverlay').classList.remove('show');
-
-    // Stop audio
     if (alarmCtx) {
       alarmNodes.forEach(n => { try { n.stop(); } catch(e) {} });
       alarmNodes = [];
       try { alarmCtx.close(); } catch(e) {}
       alarmCtx = null;
     }
-
-    // Clear timers
     clearTimeout(alarmAutoTimer);
     clearInterval(alarmTickInterval);
   }
 
-  // Request notification permission
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
+  // ── Start / Reset ──
+  function startTimer() {
+    // Hide start overlay
+    document.getElementById('startOverlay').classList.add('hidden');
+
+    // Clear any previous state
+    clearInterval(tickInterval);
+    dismissAlarm();
+    alarmedSet = new Set();
+    document.getElementById('allDone').style.display = 'none';
+    const s = document.getElementById('mainStatus');
+    s.className = 'status active';
+    s.innerHTML = '<span class="dot"></span>Running';
+
+    // Set target
+    target = new Date(Date.now() + 5 * 60 * 60 * 1000);
+    document.getElementById('targetLabel').textContent = formatCST(target);
+
+    // Build intervals
+    const totalMs = target - Date.now();
+    const totalSlots = Math.ceil(totalMs / (15 * 60000));
+    const count = Math.min(totalSlots, 50);
+    intervals = [];
+    for (let i = count; i >= 1; i--) {
+      intervals.push(new Date(target.getTime() - i * 15 * 60000));
+    }
+    intervals.push(target);
+
+    // Build grid
+    const grid = document.getElementById('timersGrid');
+    grid.innerHTML = '';
+    intervals.forEach((t, i) => {
+      const isLast = i === intervals.length - 1;
+      const row = document.createElement('div');
+      row.className = 'timer-row upcoming';
+      row.id = `row-${i}`;
+      row.innerHTML = `
+        <div class="progress-fill" id="pf-${i}"></div>
+        <div class="timer-index">${String(i+1).padStart(2,'0')}</div>
+        <div class="timer-info">
+          <div class="timer-time">${formatCST(t)}</div>
+          <div class="timer-desc">${isLast ? 'FINAL TARGET' : `Interval ${i+1} of ${intervals.length-1}`}</div>
+        </div>
+        <div class="timer-countdown" id="cd-${i}">--:--</div>
+      `;
+      grid.appendChild(row);
+    });
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    tick();
+    tickInterval = setInterval(tick, 1000);
   }
 
-  // ── TICK ─────────────────────────────────────────────
-  const alarmedSet = new Set();
+  function resetTimer() {
+    clearInterval(tickInterval);
+    dismissAlarm();
+    // Show start overlay again
+    document.getElementById('startOverlay').classList.remove('hidden');
+  }
 
   function tick() {
     const now = new Date();
 
-    // Current time display (CST)
     document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', {
       timeZone: 'America/Chicago',
       hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true
     });
 
-    // Main countdown
     const mainDiff = target - now;
     if (mainDiff <= 0) {
       document.getElementById('dHH').textContent = '00';
@@ -730,17 +768,14 @@
       s.className = 'status done';
       s.innerHTML = 'Complete';
       document.getElementById('allDone').style.display = 'block';
+      clearInterval(tickInterval);
     } else {
       const totalSec = Math.floor(mainDiff / 1000);
-      const hh = Math.floor(totalSec / 3600);
-      const mm = Math.floor((totalSec % 3600) / 60);
-      const ss = totalSec % 60;
-      document.getElementById('dHH').textContent = pad(hh);
-      document.getElementById('dMM').textContent = pad(mm);
-      document.getElementById('dSS').textContent = pad(ss);
+      document.getElementById('dHH').textContent = pad(Math.floor(totalSec / 3600));
+      document.getElementById('dMM').textContent = pad(Math.floor((totalSec % 3600) / 60));
+      document.getElementById('dSS').textContent = pad(totalSec % 60);
     }
 
-    // Per-interval rows
     intervals.forEach((t, i) => {
       const diff = t - now;
       const row = document.getElementById(`row-${i}`);
@@ -748,40 +783,28 @@
       const pf = document.getElementById(`pf-${i}`);
 
       if (diff <= 0) {
-        // Past
         row.className = 'timer-row past';
         cd.textContent = 'DONE';
-
-        // Fire alarm exactly once
         if (!alarmedSet.has(i)) {
           alarmedSet.add(i);
-          if (now - t < 5000) { // only if we just crossed it (within 5s)
-            startAlarm(formatCST(t) + ' — Timer ' + (i+1));
-          }
+          if (now - t < 5000) startAlarm(formatCST(t) + ' — Timer ' + (i+1));
         }
       } else {
         const totalSec = Math.floor(diff / 1000);
         const mm = Math.floor(totalSec / 60);
         const ss = totalSec % 60;
-        // Determine if this is the NEXT upcoming (active) timer
         const prevPast = i === 0 || (intervals[i-1] - now) <= 0;
-        if (prevPast && diff > 0) {
+        if (prevPast) {
           row.className = 'timer-row active';
           cd.textContent = pad(mm) + ':' + pad(ss);
-          // Progress within this 15-min window
-          const windowMs = 15 * 60000;
-          const elapsed = windowMs - diff % windowMs;
-          const pct = Math.min(100, (elapsed / windowMs) * 100);
+          const pct = Math.min(100, ((15 * 60000 - diff % (15 * 60000)) / (15 * 60000)) * 100);
           pf.style.width = pct + '%';
-
-          // ── Drive the mini clock ──
           document.getElementById('mMM').textContent = pad(mm);
           document.getElementById('mSS').textContent = pad(ss);
           document.getElementById('miniBar').style.width = pct + '%';
           document.getElementById('miniNextTime').textContent = formatCST(t);
-          const isLastInterval = i === intervals.length - 1;
           document.getElementById('miniLabel').textContent =
-            isLastInterval ? 'FINAL INTERVAL' : `INTERVAL ${String(i+1).padStart(2,'0')} OF ${intervals.length - 1}`;
+            i === intervals.length - 1 ? 'FINAL INTERVAL' : `INTERVAL ${String(i+1).padStart(2,'0')} OF ${intervals.length - 1}`;
         } else {
           row.className = 'timer-row upcoming';
           cd.textContent = pad(mm) + ':' + pad(ss);
@@ -789,13 +812,6 @@
       }
     });
   }
-
-  function resetTimer() {
-    window.location.href = window.location.pathname + '?r=' + Date.now();
-  }
-
-  tick();
-  setInterval(tick, 1000);
 </script>
 </body>
 </html>
