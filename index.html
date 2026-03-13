@@ -72,6 +72,20 @@
     letter-spacing: 0.15em;
   }
 
+  .reset-btn {
+    margin-top: 20px;
+    background: transparent;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    padding: 8px 28px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .reset-btn:hover { background: var(--accent2); color: var(--bg); }
+
   /* ── CLOCKS ROW ── */
   .clocks-row {
     display: grid;
@@ -479,6 +493,7 @@
   <p class="label">Countdown Active</p>
   <h1>Next<br><span>5 Hours</span></h1>
   <p class="subtitle">From now · 15-min intervals</p>
+  <button class="reset-btn" onclick="resetTimer()">RESET TIMER</button>
 </header>
 
 <div class="current-time-bar">
@@ -773,6 +788,10 @@
         }
       }
     });
+  }
+
+  function resetTimer() {
+    location.reload();
   }
 
   tick();
